@@ -1853,7 +1853,7 @@
           }
         }
         }
-        if(this.tracking === 'rzSliderModel'){
+        if((this.options.lockMaxHandle && this.tracking === 'rzSliderModel') || this.options.lockMaxHandle === undefined || this.options.lockMaxHandle === false) {
           if (this.scope[this.tracking] !== newValue) {
             this.scope[this.tracking] = newValue;
             this.updateHandles(this.tracking, this.valueToOffset(newValue));
