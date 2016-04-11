@@ -1,7 +1,7 @@
 /*! angularjs-slider - v2.11.0 - 
  (c) Rafal Zajac <rzajac@gmail.com>, Valentin Hervieu <valentin@hervieu.me>, Jussi Saarivirta <jusasi@gmail.com>, Angelin Sirbu <angelin.sirbu@gmail.com> - 
  https://github.com/angular-slider/angularjs-slider - 
- 2016-04-01 */
+ 2016-04-11 */
 /*jslint unparam: true */
 /*global angular: false, console: false, define, module */
 (function(root, factory) {
@@ -61,7 +61,9 @@
       onStart: null,
       onChange: null,
       onEnd: null,
-      rightToLeft: false
+      rightToLeft: false,
+      lockMaxHandle: false,
+      transparentMaxHandle: false
     };
     var globalOptions = {};
 
@@ -149,6 +151,7 @@
        * @type {ngScope}
        */
       this.scope = scope;
+
 
       /**
        * Slider element wrapped in jqLite
@@ -373,6 +376,7 @@
         this.setMinAndMax();
         this.updateLowHandle(this.valueToOffset(this.scope.rzSliderModel));
         this.updateSelectionBar();
+        this.updateBackwardSelectionBar();
         this.updateTicksScale();
         this.updateAriaAttributes();
         if (this.range) {
@@ -443,6 +447,9 @@
           this.positionProperty = 'bottom';
           this.dimensionProperty = 'height';
         }
+        if(this.options.transparentMaxHandle){
+          this.scope.transparentMaxHandle = true;
+        }
       },
 
       /**
@@ -482,27 +489,30 @@
               this.selBar = jElem;
               break;
             case 2:
-              this.minH = jElem;
+              this.backSelBar = jElem;
               break;
             case 3:
-              this.maxH = jElem;
+              this.minH = jElem;
               break;
             case 4:
-              this.flrLab = jElem;
+              this.maxH = jElem;
               break;
             case 5:
-              this.ceilLab = jElem;
+              this.flrLab = jElem;
               break;
             case 6:
-              this.minLab = jElem;
+              this.ceilLab = jElem;
               break;
             case 7:
-              this.maxLab = jElem;
+              this.minLab = jElem;
               break;
             case 8:
-              this.cmbLab = jElem;
+              this.maxLab = jElem;
               break;
             case 9:
+              this.cmbLab = jElem;
+              break;
+            case 10:
               this.ticks = jElem;
               break;
           }
@@ -511,6 +521,7 @@
 
         // Initialize offset cache properties
         this.selBar.rzsp = 0;
+        this.backSelBar.rzsp=0;
         this.minH.rzsp = 0;
         this.maxH.rzsp = 0;
         this.flrLab.rzsp = 0;
@@ -605,7 +616,8 @@
          */
         if (this.range)
           this.updateHighHandle(this.valueToOffset(this.scope.rzSliderHigh));
-        this.updateSelectionBar();
+          this.updateSelectionBar();
+          this.updateBackwardSelectionBar();
         if (this.range)
           this.updateCmbLabel();
 
@@ -760,10 +772,19 @@
           var tick = {
             selected: this.isTickSelected(value)
           };
+          if(this.options.lockMaxHandle && this.options.transparentMaxHandle){
+           tick.backSelected =  this.isTickBackwardSelected(value);
+          }
+
           if (tick.selected && this.options.getSelectionBarColor) {
             tick.style = {
               'background-color': this.getSelectionBarColor()
             };
+          }
+          if(tick.backSelected){
+            tick.style = {
+              'background-color': '#000000'
+            }
           }
           if (this.options.ticksTooltip) {
             tick.tooltip = this.options.ticksTooltip(value);
@@ -792,7 +813,9 @@
               return true;
             else if (this.scope.rzSliderModel < center && value <= center && value >= this.scope.rzSliderModel)
               return true;
+
           }
+
           else if (this.options.showSelectionBarEnd) {
             if (value >= this.scope.rzSliderModel)
               return true;
@@ -801,6 +824,29 @@
             return true;
         }
         if (this.range && value >= this.scope.rzSliderModel && value <= this.scope.rzSliderHigh)
+          return true;
+        else if (this.range && this.options.lockMaxHandle && this.scope.rzSliderModel === this.scope.rzSliderHigh && value < this.scope.rzSliderModel)
+          return true;
+        return false;
+      },
+
+      isTickBackwardSelected: function(value) {
+        if (!this.range) {
+          if (this.options.showSelectionBarFromValue !== null) {
+            var center = this.options.showSelectionBarFromValue;
+            if (this.scope.rzSliderModel > center && value >= center && value <= this.scope.rzSliderModel)
+              return true;
+            else if (this.scope.rzSliderModel < center && value <= center && value >= this.scope.rzSliderModel)
+              return true;
+          }
+          else if (this.options.showSelectionBarEnd) {
+            if (value >= this.scope.rzSliderModel)
+              return true;
+          }
+          else if (this.options.showSelectionBar && value <= this.scope.rzSliderModel)
+            return true;
+        }
+        if (this.range && value < this.scope.rzSliderModel && this.scope.rzSliderModel != this.scope.rzSliderHigh)
           return true;
         return false;
       },
@@ -836,12 +882,13 @@
        * @param {number} newOffset
        */
       updateHandles: function(which, newOffset) {
-        if (which === 'rzSliderModel')
+        if (which === 'rzSliderModel' || this.options.lockMaxHandle === true)
           this.updateLowHandle(newOffset);
         else
           this.updateHighHandle(newOffset);
 
         this.updateSelectionBar();
+        this.updateBackwardSelectionBar();
         this.updateTicksScale();
         if (this.range)
           this.updateCmbLabel();
@@ -902,7 +949,7 @@
         if (this.options.getPointerColor) {
           var pointercolor = this.getPointerColor('max');
           this.scope.maxPointerStyle = {
-            backgroundColor: pointercolor
+            backgroundColor: 'pointercolor'
           };
         }
 
@@ -976,8 +1023,13 @@
           positionForRange = this.options.rightToLeft ? this.maxH.rzsp + this.handleHalfDim : this.minH.rzsp + this.handleHalfDim;
 
         if (this.range) {
-          dimension = Math.abs(this.maxH.rzsp - this.minH.rzsp);
-          position = positionForRange;
+          if(this.options.lockMaxHandle === true && this.minH.rzsp === this.maxH.rzsp){
+            dimension = Math.abs(this.maxH.rzsp -this.options.floor);
+            position = 0;
+          }else{
+            dimension = Math.abs(this.maxH.rzsp - this.minH.rzsp);
+            position = positionForRange;
+          }
         }
         else {
           if (this.options.showSelectionBarFromValue !== null) {
@@ -1001,6 +1053,9 @@
             position = 0;
           }
         }
+        if(this.scope.transparentMaxHandle){
+          dimension+=5;
+        }
         this.setDimension(this.selBar, dimension);
         this.setPosition(this.selBar, position);
         if (this.options.getSelectionBarColor) {
@@ -1011,6 +1066,47 @@
         }
       },
 
+      updateBackwardSelectionBar: function() {
+        var position = 0,
+          dimension = 0,
+          isSelectionBarFromRight = this.options.rightToLeft ? !this.options.showSelectionBarEnd : this.options.showSelectionBarEnd
+
+
+        if (this.range) {
+          dimension = Math.abs(this.minH.rzsp - 1);
+          console.log("DIMENSION :" + String(dimension))
+        }
+        else {
+          if (this.options.showSelectionBarFromValue !== null) {
+            var center = this.options.showSelectionBarFromValue,
+              centerPosition = this.valueToOffset(center),
+              isModelGreaterThanCenter = this.options.rightToLeft ? this.scope.rzSliderModel <= center : this.scope.rzSliderModel > center;
+            if (isModelGreaterThanCenter) {
+              dimension = this.minH.rzsp - centerPosition;
+              position = centerPosition + this.handleHalfDim;
+            }
+            else {
+              dimension = centerPosition - this.minH.rzsp;
+              position = this.minH.rzsp + this.handleHalfDim;
+            }
+          }
+          else if (isSelectionBarFromRight) {
+            dimension = Math.abs(this.maxPos - this.minH.rzsp) + this.handleHalfDim;
+            position = this.minH.rzsp + this.handleHalfDim;
+          } else {
+            dimension = Math.abs(this.maxH.rzsp - this.minH.rzsp) + this.handleHalfDim;
+            position = 0;
+          }
+        }
+        this.setDimension(this.backSelBar, dimension);
+
+        if (this.options.getSelectionBarColor) {
+          var color = this.getSelectionBarColor();
+          this.scope.barStyle = {
+            backgroundColor: color
+          };
+        }
+      },
       /**
        * Wrapper around the getSelectionBarColor of the user to pass to
        * correct parameters
@@ -1020,6 +1116,7 @@
           return this.options.getSelectionBarColor(this.scope.rzSliderModel, this.scope.rzSliderHigh);
         return this.options.getSelectionBarColor(this.scope.rzSliderModel);
       },
+
 
       /**
        * Wrapper around the getPointerColor of the user to pass to
@@ -1063,7 +1160,11 @@
             ),
             this.barDimension - this.cmbLab.rzsd
           );
-          this.setPosition(this.cmbLab, pos);
+          if(this.options.lockMaxHandle && this.options.transparentMaxHandle)
+            this.setPosition(this.cmbLab, this.maxLab.rzsp);
+          else
+            this.setPosition(this.cmbLab, pos);
+
           this.hideEl(this.minLab);
           this.hideEl(this.maxLab);
           this.showEl(this.cmbLab);
@@ -1271,7 +1372,7 @@
        * @returns {jqLite} The handle closest to the event.
        */
       getNearestHandle: function(event) {
-        if (!this.range) {
+        if (!this.range || this.options.lockMaxHandle === true) {
           return this.minH;
         }
         var offset = this.getEventPosition(event),
@@ -1397,13 +1498,18 @@
         // We have to do this in case the HTML where the sliders are on
         // have been animated into view.
         this.calcViewDimensions();
-
-        if (pointer) {
-          this.tracking = ref;
-        } else {
+        if(this.options.lockMaxHandle === true) {
+          this.tracking = 'rzSliderModel'
           pointer = this.getNearestHandle(event);
-          this.tracking = pointer === this.minH ? 'rzSliderModel' : 'rzSliderHigh';
+        }else {
+          if (pointer) {
+            this.tracking = ref;
+          } else {
+            pointer = this.getNearestHandle(event);
+            this.tracking = pointer === this.minH ? 'rzSliderModel' : 'rzSliderHigh';
+          }
         }
+
 
         pointer.addClass('rz-active');
 
@@ -1697,6 +1803,23 @@
         if (this.range) {
           newValue = this.applyMinRange(newValue);
           /* This is to check if we need to switch the min and max handles */
+          if(this.options.lockMaxHandle && newValue <= this.scope.rzSliderHigh){
+            if(this.options.lockMaxHandle && newValue < this.scope.rzSliderHigh){
+              this.scope.backselection = true;
+            }else{
+              this.scope.backselection = false;
+            }
+            this.scope[this.tracking] = this.scope.rzSliderModel;
+            this.updateHandles(this.tracking, this.minH.rzsp);
+            this.updateAriaAttributes();
+            this.tracking = 'rzSliderModel';
+            this.maxH.removeClass('rz-active');
+            this.minH.addClass('rz-active');
+            if (this.options.keyboardSupport)
+              this.focusElement(this.minH);
+
+            }
+          else {
           if (this.tracking === 'rzSliderModel' && newValue > this.scope.rzSliderHigh) {
             if (this.options.noSwitching && this.scope.rzSliderHigh !== this.minValue) {
               newValue = this.applyMinRange(this.scope.rzSliderHigh);
@@ -1729,14 +1852,15 @@
             valueChanged = true;
           }
         }
-
-        if (this.scope[this.tracking] !== newValue) {
-          this.scope[this.tracking] = newValue;
-          this.updateHandles(this.tracking, this.valueToOffset(newValue));
-          this.updateAriaAttributes();
-          valueChanged = true;
         }
-
+        if(this.tracking === 'rzSliderModel'){
+          if (this.scope[this.tracking] !== newValue) {
+            this.scope[this.tracking] = newValue;
+            this.updateHandles(this.tracking, this.valueToOffset(newValue));
+            this.updateAriaAttributes();
+            valueChanged = true;
+          }
+        }
         if (valueChanged)
           this.applyModel();
       },
@@ -1883,7 +2007,7 @@
   'use strict';
 
   $templateCache.put('rzSliderTpl.html',
-    "<span class=rz-bar-wrapper><span class=rz-bar></span></span> <span class=rz-bar-wrapper><span class=\"rz-bar rz-selection\" ng-style=barStyle></span></span> <span class=\"rz-pointer rz-pointer-min\" ng-style=minPointerStyle></span> <span class=\"rz-pointer rz-pointer-max\" ng-style=maxPointerStyle></span> <span class=\"rz-bubble rz-limit\"></span> <span class=\"rz-bubble rz-limit\"></span> <span class=rz-bubble></span> <span class=rz-bubble></span> <span class=rz-bubble></span><ul ng-show=showTicks class=rz-ticks><li ng-repeat=\"t in ticks track by $index\" class=rz-tick ng-class=\"{'rz-selected': t.selected}\" ng-style=t.style ng-attr-uib-tooltip=\"{{ t.tooltip }}\" ng-attr-tooltip-placement={{t.tooltipPlacement}} ng-attr-tooltip-append-to-body=\"{{ t.tooltip ? true : undefined}}\"><span ng-if=\"t.value != null\" class=rz-tick-value ng-attr-uib-tooltip=\"{{ t.valueTooltip }}\" ng-attr-tooltip-placement={{t.valueTooltipPlacement}}>{{ t.value }}</span></li></ul>"
+    "<span class=rz-bar-wrapper><span class=rz-bar></span></span> <span class=rz-bar-wrapper><span class=\"rz-bar rz-selection\" ng-style=barStyle></span></span> <span class=rz-bar-wrapper ng-show=backselection><span class=\"rz-bar rz-tocurrent\" ng-style=barStyle ng-show=backselection></span></span> <span class=\"rz-pointer rz-pointer-min\" ng-style=minPointerStyle></span> <span class=\"rz-pointer rz-pointer-max\" ng-style=maxPointerStyle ng-hide=transparentMaxHandle></span> <span class=\"rz-bubble rz-limit\"></span> <span class=\"rz-bubble rz-limit\"></span> <span class=rz-bubble></span> <span class=rz-bubble></span> <span class=rz-bubble></span><ul ng-show=showTicks class=rz-ticks><li ng-repeat=\"t in ticks track by $index\" class=rz-tick ng-class=\"{'rz-selected': t.selected,'rz-tocurrent':t.backSelected}\" ng-style=t.style ng-attr-uib-tooltip=\"{{ t.tooltip }}\" ng-attr-tooltip-placement={{t.tooltipPlacement}} ng-attr-tooltip-append-to-body=\"{{ t.tooltip ? true : undefined}}\"><span ng-if=\"t.value != null\" class=rz-tick-value ng-attr-uib-tooltip=\"{{ t.valueTooltip }}\" ng-attr-tooltip-placement={{t.valueTooltipPlacement}}>{{ t.value }}</span></li></ul>"
   );
 
 }]);

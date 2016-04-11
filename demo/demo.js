@@ -8,13 +8,29 @@ app.controller('MainCtrl', function($scope, $rootScope, $timeout, $modal) {
 
   //Range slider config
   $scope.rangeSlider = {
-    minValue: 10,
-    maxValue: 90,
+    minValue: 1,
+    maxValue: 10,
     options: {
-      floor: 0,
-      ceil: 100,
-      step: 1
+      floor: 1,
+      ceil: 20,
+      step: 1,
+
     }
+
+  };
+  //Range slider config
+  $scope.etrangeSlider = {
+    minValue: 1,
+    maxValue: 1,
+    options: {
+      floor: 1,
+      ceil: 10,
+      step: 1,
+      showTicks: true,
+      lockMaxHandle:true,
+      transparentMaxHandle:true
+    }
+
   };
 
   //Range slider with minRange config

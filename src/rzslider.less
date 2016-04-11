@@ -66,6 +66,11 @@ rzslider {
       background: @barFillColor;
       .rounded(@barDimension/2);
     }
+    &.rz-tocurrent {
+      z-index: 2;
+      background: @toCurrentColor;
+      .rounded(@barDimension/2);
+    }
   }
 
   .rz-pointer {
@@ -142,6 +147,9 @@ rzslider {
       border-radius: 50%;
       &.rz-selected {
         background: @selectedTicksColor;
+      }
+      &.rz-tocurrent{
+        background: @toCurrentColor;
       }
       .rz-tick-value {
         position: absolute;
